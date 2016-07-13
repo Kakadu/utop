@@ -299,7 +299,11 @@ let rec map_items unwrap wrap items =
       match sig_item with
       | Outcometree.Osig_class (_, name, _, _, rs)
       | Outcometree.Osig_class_type (_, name, _, _, rs)
+#ifdef WITH_IMPLICITS
+      | Outcometree.Osig_module (name, _, rs, _)
+#else
       | Outcometree.Osig_module (name, _, rs)
+#endif
 #if OCAML_VERSION >= (4, 02, 0)
       | Outcometree.Osig_type ({ Outcometree.otype_name = name }, rs) ->
 #else
@@ -343,11 +347,20 @@ let rec map_items unwrap wrap items =
               wrap (Outcometree.Osig_class_type (a, name, b, c, Outcometree.Orec_first)) extra :: items'
             else
               items
+#ifdef WITH_IMPLICITS
+          | Outcometree.Osig_module (name, a, rs, flag) ->
+            if rs = Outcometree.Orec_next then
+              wrap (Outcometree.Osig_module (name, a, Outcometree.Orec_first, flag)) extra ::
+              items'
+            else
+              items
+#else
           | Outcometree.Osig_module (name, a, rs) ->
             if rs = Outcometree.Orec_next then
               wrap (Outcometree.Osig_module (name, a, Outcometree.Orec_first)) extra :: items'
             else
               items
+#endif
           | Outcometree.Osig_type (oty, rs) ->
             if rs = Outcometree.Orec_next then
               wrap (Outcometree.Osig_type (oty, Outcometree.Orec_first)) extra :: items'
@@ -431,10 +444,15 @@ let wrap_unit loc e =
   }
 #endif
 
-#if OCAML_VERSION >= (4, 03, 0)
-let nolabel = Asttypes.Nolabel
+#ifdef WITH_IMPLICITS
+let nolabel_arr = Parsetree.Parr_simple
+let nolabel_app = Parsetree.Papp_simple
+#elif OCAML_VERSION >= (4, 03, 0)
+let nolabel_arr = Asttypes.Nolabel
+let nolabel_app = Asttypes.Nolabel
 #else
-let nolabel = ""
+let nolabel_arr = ""
+let nolabel_app = ""
 #endif
 
 let rewrite_rules = [
@@ -454,7 +472,7 @@ let rewrite_rules = [
 #else
       let open Ast_helper in
       with_default_loc loc (fun () ->
-        Exp.apply (Exp.ident (with_loc loc longident_lwt_main_run)) [(nolabel, e)]
+        Exp.apply (Exp.ident (with_loc loc longident_lwt_main_run)) [(nolabel_app, e)]
       )
 #endif
     );
@@ -482,7 +500,7 @@ let rewrite_rules = [
       with_default_loc loc (fun () ->
         Exp.apply
           (Exp.ident (with_loc loc longident_async_thread_safe_block_on_async_exn))
-          [(nolabel, Exp.fun_ nolabel None punit e)]
+          [(nolabel_app, Exp.fun_ nolabel_arr None punit e)]
       )
 #endif
     );
@@ -518,8 +536,12 @@ let rule_path rule =
 let rec is_persistent_path = function
   | Path.Pident id -> Ident.persistent id
   | Path.Pdot (p, _, _) -> is_persistent_path p
-  | Path.Papply (_, p) -> is_persistent_path p
-
+#ifdef WITH_IMPLICITS
+  | Path.Papply (_, p,_) ->
+#else
+  | Path.Papply (_, p) ->
+#endif
+    is_persistent_path p
 (* Check that the given long identifier is present in the environment
    and is persistent. *)
 let is_persistent_in_env longident =

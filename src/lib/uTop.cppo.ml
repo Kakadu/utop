@@ -299,7 +299,9 @@ let with_loc loc str = {
   Location.loc = loc;
 }
 
-#if OCAML_VERSION >= (4, 03, 0)
+#ifdef WITH_IMPLICITS
+let nolabel = Parsetree.Parr_simple
+#elif OCAML_VERSION >= (4, 03, 0)
 let nolabel = Asttypes.Nolabel
 #else
 let nolabel = ""
@@ -354,6 +356,19 @@ let check_phrase phrase =
           pstr_loc = loc;
         } in
 #else
+#ifdef WITH_IMPLICITS
+        let top_def =
+          let open Ast_helper in
+          with_default_loc loc
+            (fun () ->
+               Str.eval
+                 (Exp.fun_ nolabel None (Pat.construct unit None)
+                    (Exp.letmodule
+                       (Mb.mk  (with_loc loc "_") (Mod.structure (item :: items)))
+                       (Exp.construct unit None)
+                   )))
+       in
+#else
         let top_def =
           let open Ast_helper in
           with_default_loc loc
@@ -364,6 +379,7 @@ let check_phrase phrase =
                       (Mod.structure (item :: items))
                       (Exp.construct unit None))))
         in
+#endif
 #endif
         let check_phrase = Ptop_def [top_def] in
         try

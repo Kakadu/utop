@@ -712,6 +712,13 @@ let () =
 
 
              let interact_enabled = BaseEnvLight.var_get "interact" env = "true" in
+
+             flag ["cppo"; "cppo_interact"] (
+               if Sys.ocaml_version = "4.02.3-modular-implicits" then
+                 S [A "-D"; A "WITH_IMPLICITS"]
+               else
+                 N);
+
              flag ["cppo"; "cppo_interact"] (
                if interact_enabled then
                  S [A "-D"; A "ENABLE_INTERACT"]
